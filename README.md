@@ -1,142 +1,92 @@
-# 🌾 FreshGrid — Scan · Store · Sell
+# FreshGrid 🌾 Scan · Store · Sell
 
-**An agri-tech app for Indian smallholder farmers and FPOs (Farmer Producer Organisations).**
-Farmers grade their produce with an on-device AI model, book a nearby cold room, check live government mandi prices, and sell graded lots to buyers through an escrow-style flow. The app works in **Hindi and English**.
+FreshGrid is a phone app for small farmers and FPOs (Farmer Producer Organisations) in India. A farmer can grade a crate of produce with the camera, book a cold room nearby, check today's mandi price, and sell the lot to a buyer, with the payment held in escrow until delivery. It works in Hindi and English.
 
-🔗 **Live demo:** https://freshgrid-app-final.vercel.app
-📂 **Docs:** [Architecture](docs/ARCHITECTURE.md) · [Demo walkthrough for judges](docs/DEMO.md)
+**Live demo:** https://freshgrid-app-final.vercel.app
+**More docs:** [Architecture](docs/ARCHITECTURE.md) · [Demo walkthrough for judges](docs/DEMO.md)
 
-> **Hackathon prototype.** No real money moves. All payments are **test payments**, and some steps are simulated.
-> The [What's real and what's simulated](#-whats-real-and-whats-simulated) section lists each one.
+> This is a hackathon prototype. No real money moves: every payment is a test payment, and a few steps are simulated. We list them all [further down](#whats-real-and-whats-simulated).
 
----
+## Team
 
-## 📌 The problem
+| Name | Role |
+|---|---|
+| Rahul Rajpal ([@yellow1flash1](https://github.com/yellow1flash1)) | Backend developer |
+| Anmol | App UI |
+| Parth | Database manager |
+| Anirudh | Frontend developer |
 
-Many Indian smallholder farmers lose a large share of their perishable harvest after it is picked, and sell what is left at a low price:
+## Why we built it
 
-- **No cold storage nearby**, or no easy way to find and book it, so produce spoils within days.
-- **No objective grading**, so good produce gets the same low price as bad.
-- **Poor price information**, so the farmer sells at whatever the local middleman offers.
-- **Long commission chains** and late or uncertain payment.
+A lot of what small farmers grow spoils before it's sold, and what's left often goes cheap. There's usually no cold storage nearby (or no easy way to book it), no fair way to prove produce is good quality, little idea of the going rate, and a long chain of middlemen who pay late. We wanted one app that covers the whole trip from field to buyer.
 
-## 💡 Our solution
+## What it does
 
-FreshGrid gives the farmer one phone app covering the whole path from harvest to sale:
+**For farmers**
+- **Scan:** point the camera at a crate and an AI model grades it A, B or C, then saves a grade certificate. The models (apple, and tomato/potato) were trained with [Teachable Machine](https://teachablemachine.withgoogle.com/) and run in the browser with TensorFlow.js. See [`ScanTab.tsx`](src/components/fg/ScanTab.tsx).
+- **Store:** a map of cold rooms nearby with prices and free slots, plus real cold stores and mandis pulled from OpenStreetMap. Prices and capacity are checked on the server.
+- **Price:** live Agmarknet prices from data.gov.in for the farmer's state.
+- **Sell and pay:** list graded lots, pay storage dues, and share a secret 6-digit delivery code with the buyer.
+- **Income estimator:** compares selling at the mandi the usual way with going through FreshGrid.
+- **Kisan Sahayak:** a chat assistant (Google Gemini) that answers in Hindi or English using the farmer's own scans, bookings and prices.
 
-| Step | What the farmer does | How FreshGrid helps |
+**For buyers**
+- A market of open graded lots you can filter by crop, with today's mandi price shown next to each one.
+- Escrow orders: the buyer pays first, and the money is released only once they enter the farmer's delivery code. The code is checked on the server, and you're locked out after 5 wrong tries.
+- New lots show up right away (Supabase Realtime).
+
+Other bits: email or Google sign-in, separate farmer and buyer roles, adjustable text size, and layouts for phone and desktop.
+
+## What's real and what's simulated
+
+We'd rather be upfront about this than have judges find out later.
+
+| Area | Status | Notes |
 |---|---|---|
-| **1. Scan** | Points the phone camera at a crate | An AI image model grades the produce **A / B / C** and issues a digital grade certificate |
-| **2. Store** | Books a cold room | A map of nearby cold rooms with prices and free slots, plus real nearby cold stores and mandis from OpenStreetMap |
-| **3. Price** | Checks today's rate | Live **Agmarknet** modal prices (Govt. of India, data.gov.in) for the farmer's state |
-| **4. Sell** | Lists a graded lot | Buyers order and pay into escrow. Money is released only after the buyer enters the farmer's secret **6-digit delivery code** |
-| **5. Plan** | Compares income | An estimator compares a traditional mandi sale with the FreshGrid route |
-| **6. Ask** | Asks a question in Hindi or English | **Kisan Sahayak**, an AI assistant that answers using the farmer's own scans, bookings, lots and live prices |
+| Sign-in, roles, profiles | ✅ Real | Supabase Auth with row-level security |
+| AI grading for apple, tomato, potato | ✅ Real model | Trained on small datasets and not checked against official grading standards |
+| AI grading for other crops, or with no camera | 🟡 Simulated | Gives a random grade and says so on screen |
+| Certificate details (uniformity, spoilage, shelf life) | 🟡 Derived | Fixed values for each grade, not measured |
+| Mandi prices | ✅ Real | Agmarknet API (needs `DATA_GOV_IN_API_KEY`); falls back to fixed rates in [`crops.ts`](src/lib/crops.ts) |
+| Cold stores and mandis on the map | ✅ Real | OpenStreetMap, so only as complete as OSM is for that area |
+| Bookable cold rooms | 🟡 Sample data | Demo listings in a few Haryana and Delhi districts. Not real businesses, and badges like "FPO Certified" are just for show |
+| Booking amounts, slots, lot totals | ✅ Real logic | Calculated in Postgres, so the browser can't change prices |
+| UPI / QR / KCC payments | 🔴 Simulated | No payment gateway. "Paying" is an animation and the UTR is a random number |
+| Escrow | 🟡 Logic only | Open → escrow → settled, with the handover code. No money is actually held |
+| Farmer ID (Aadhaar / KCC / PM-Kisan) | 🔴 Not verified | We only store the number; no government API is called |
+| UPI ID check | 🔴 Format only | Doesn't contact NPCI |
+| Kisan Sahayak | ✅ Real | Gemini (needs `GEMINI_API_KEY`), told not to make up numbers |
+| Income estimator | 🟡 Assumptions | Uses our own estimated rates, below |
 
----
+### Income estimator assumptions
 
-## ✨ Features
+From [`src/lib/income.ts`](src/lib/income.ts):
 
-### For farmers (`Shell.tsx`)
-- 🔍 **AI crate scan** ([`ScanTab.tsx`](src/components/fg/ScanTab.tsx)): two [Teachable Machine](https://teachablemachine.withgoogle.com/) image models (one for apple, one for tomato and potato) run **in the browser** with TensorFlow.js. The result is saved as a grade certificate.
-- ❄️ **Cold room booking** ([`ColdTab.tsx`](src/components/fg/ColdTab.tsx), [`ColdMap.tsx`](src/components/fg/ColdMap.tsx)): Leaflet map, GPS location, free-slot counts, Google Maps directions. Prices and capacity are checked on the server.
-- 💰 **Payments and Kisan khata** ([`PayTab.tsx`](src/components/fg/PayTab.tsx)): pay storage dues, list lots for sale, see the delivery code, cancel open lots.
-- 📈 **Income estimator** ([`IncomeTab.tsx`](src/components/fg/IncomeTab.tsx), [`income.ts`](src/lib/income.ts)): side-by-side comparison of a traditional sale and the FreshGrid route.
-- 🤖 **Kisan Sahayak assistant** ([`AssistTab.tsx`](src/components/fg/AssistTab.tsx), [`ai.server.ts`](src/lib/ai.server.ts)): streamed AI chat (Google Gemini) that answers using the farmer's own data.
-
-### For buyers (`BuyerShell.tsx`)
-- 🛒 **Market** of open graded lots, filterable by crop, with today's mandi price shown next to each lot.
-- 🔒 **Escrow orders**: the buyer pays, and payment is released only after delivery is confirmed with the farmer's 6-digit code. The code is checked on the server, with a 5-attempt lockout.
-- ⚡ **Realtime updates**: new lots appear on the buyer's screen immediately (Supabase Realtime).
-
-### Across the app
-- 🇮🇳 Hindi and English throughout, adjustable text size, mobile and desktop layouts.
-- 👤 Email or Google sign-in, separate farmer and buyer roles, and a one-time profile setup (village, UPI ID, farmer ID).
-
----
-
-## ✅ What's real and what's simulated
-
-We want judges to know exactly what works today and what is mocked.
-
-| Area | Status | Details |
+| | Usual mandi sale | FreshGrid |
 |---|---|---|
-| Sign-in, roles, profiles | ✅ **Real** | Supabase Auth with Postgres row-level security |
-| AI grading (apple, tomato, potato) | ✅ **Real model** | Our Teachable Machine models run in the browser. ⚠️ Small hackathon-sized training sets, **not validated** against official grading standards |
-| AI grading (other crops / no camera / model fails) | 🟡 **Simulated** | Falls back to a **random grade**, and the app shows a "simulated scan" message. See `ScanTab.tsx` |
-| Grade certificate details (uniformity, spoilage, shelf life) | 🟡 **Derived from the grade** | Fixed values per grade, not measured |
-| Live mandi prices | ✅ **Real** | Agmarknet API on data.gov.in (needs `DATA_GOV_IN_API_KEY`). Without a key, the app falls back to fixed rates in [`crops.ts`](src/lib/crops.ts) |
-| Nearby cold stores and mandis on the map | ✅ **Real** | OpenStreetMap Overpass API. Depends on how complete OSM data is in each area |
-| Bookable cold rooms (Sonipat, Karnal, Panipat, Delhi…) | 🟡 **Sample data** | Seeded demo listings in the first database migration. **Not real businesses, no partnerships.** Their badges (e.g. "FPO Certified") are illustrative |
-| Booking amounts, slot capacity, lot totals | ✅ **Real logic** | Calculated on the server (Postgres functions), so the browser can't change prices |
-| UPI / QR / KCC payments | 🔴 **Simulated** | No payment gateway. "Payment" is a timed animation and the UTR is a random test number. No money moves |
-| Escrow | 🟡 **Logic only** | State machine (open → escrow → settled) with a secret handover code. No funds are actually held |
-| Farmer ID (Aadhaar / KCC / PM-Kisan) "Verify" | 🔴 **Not verified** | Only stores the number. No government API is called. The app says "Govt. verification will be done by your FPO" |
-| UPI ID "Check" | 🔴 **Format check only** | Checks the format and guesses the bank from the handle. Does not contact NPCI |
-| Kisan Sahayak AI | ✅ **Real** | Google Gemini (needs `GEMINI_API_KEY`). Told not to invent numbers, and to say payments are test-only |
-| Income estimator | 🟡 **Model with assumptions** | Uses our assumed loss, commission and transport rates (below), not field data |
-
-### Income estimator assumptions ([`src/lib/income.ts`](src/lib/income.ts))
-
-| | Traditional mandi | FreshGrid route |
-|---|---|---|
-| Post-harvest loss | 38% | 8% (graded + cold storage) |
+| Post-harvest loss | 38% | 8% |
 | Commission | 12% | 8% |
-| Transport | ₹3.5 / kg | ₹2.2 / kg |
-| Other fees | ₹1.058 / kg | — |
+| Transport | ₹3.5/kg | ₹2.2/kg |
+| Other fees | ₹1.058/kg | — |
 | Cold storage | — | ₹18 per 20 kg crate per day |
 | Escrow fee | — | ₹104 flat |
 
-Example (1,000 kg tomato at ₹30/kg, 3 days of storage): **₹11,810 → ₹20,388 (+73%)**. This exact case is covered by [`src/test/income.test.ts`](src/test/income.test.ts).
-These rates are our **estimates for the demo**. They would need checking with real FPO data before anyone relies on them.
+For example, 1,000 kg of tomato at ₹30/kg stored for 3 days comes out at ₹11,810 the usual way and ₹20,388 with FreshGrid (+73%). That case has a test in [`src/test/income.test.ts`](src/test/income.test.ts). These are our guesses for the demo and would need checking against real FPO numbers.
 
----
+## Tech stack
 
-## 🏗️ How it works
+- **Frontend:** React 19, TanStack Start / Router / Query, Tailwind CSS 4, shadcn/ui, Recharts
+- **AI:** TensorFlow.js + Teachable Machine in the browser, Google Gemini for the assistant
+- **Maps:** Leaflet, OpenStreetMap, Overpass API
+- **Backend:** Supabase (Postgres, Auth, Realtime, row-level security, PL/pgSQL functions)
+- **Data:** Agmarknet daily prices from [data.gov.in](https://data.gov.in)
+- **Tooling and hosting:** Vite, TypeScript, Vitest, ESLint, Prettier, Bun, Vercel
 
-```mermaid
-flowchart LR
-  subgraph Phone["📱 Browser (React 19 + TanStack Start)"]
-    Cam[Camera] --> TM[Teachable Machine<br/>TF.js model]
-    UI[Farmer / Buyer UI]
-  end
-  subgraph Server["⚙️ TanStack Start server (Vercel)"]
-    Chat["/api/chat"]
-    Mandi[getMandiPrices<br/>server fn]
-  end
-  subgraph Supabase["🗄️ Supabase"]
-    Auth[Auth]
-    DB[(Postgres + RLS<br/>+ RPC functions)]
-    RT[Realtime]
-  end
-  UI --> Auth
-  UI -->|tables + RPCs| DB
-  DB --> RT --> UI
-  UI --> Chat --> Gemini[Google Gemini]
-  UI --> Mandi --> Agmark[data.gov.in<br/>Agmarknet]
-  UI --> OSM[OpenStreetMap<br/>Overpass + tiles]
-  TM --> UI
-```
+How the pieces fit together, plus the data model and money flow, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-The full data model, money flow and security design are in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+## Running it locally
 
-### Tech stack
-
-| Layer | Tools |
-|---|---|
-| Frontend | React 19, TanStack Start / Router / Query, Tailwind CSS 4, shadcn/ui (Radix), Recharts |
-| AI / ML | TensorFlow.js + Teachable Machine (in the browser), Google Gemini (assistant) |
-| Maps | Leaflet, react-leaflet, OpenStreetMap, Overpass API |
-| Backend | Supabase (Postgres, Auth, Realtime, row-level security, PL/pgSQL RPCs) |
-| Data | Agmarknet daily prices from [data.gov.in](https://data.gov.in) |
-| Tooling | Vite 8, TypeScript, Vitest, ESLint, Prettier, Bun |
-| Hosting | Vercel |
-
----
-
-## 🚀 Run it locally
-
-**You need:** Node.js 20+ (or Bun) and a Supabase project.
+You'll need Node.js 20+ (or Bun) and a Supabase project.
 
 ```bash
 git clone https://github.com/yellow1flash1/FRESHGRID_APP_FINAL.git
@@ -150,87 +100,49 @@ cd FRESHGRID_APP_FINAL && npm install
 cp .env.example .env
 ```
 
-Fill in `.env` (see the table below), apply the SQL files in [`drizzle/migrations/`](drizzle/migrations) to your Supabase database in order, then:
+Fill in `.env`, run the SQL files in [`drizzle/migrations/`](drizzle/migrations) on your Supabase database in order, then:
 
 ```bash
 npm run dev
 ```
 
-### Environment variables
-
-| Variable | Required | Used for |
+| Variable | Needed? | For |
 |---|---|---|
-| `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` | ✅ | Browser Supabase client |
-| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PROJECT_ID` | ✅ | Server-side checks (e.g. confirming the user is signed in for `/api/chat`) |
-| `GEMINI_API_KEY` | Optional | Kisan Sahayak assistant |
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` | Yes | Supabase in the browser |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PROJECT_ID` | Yes | Server-side checks, e.g. sign-in for `/api/chat` |
+| `GEMINI_API_KEY` | Optional | Kisan Sahayak |
 | `DATA_GOV_IN_API_KEY` | Optional | Live mandi prices ([free key](https://data.gov.in)) |
 
-The Supabase *publishable* (anon) key is meant to be public, and access is protected by row-level security. **Never** commit a `service_role` key or the Gemini / data.gov.in keys.
+The Supabase publishable key is fine to be public since row-level security protects the data. Don't commit a `service_role` key or the Gemini / data.gov.in keys.
 
-### Scripts
+Other scripts: `npm run build`, `npm test` (income model and routing tests), `npm run lint`.
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Start the dev server |
-| `npm run build` | Production build |
-| `npm test` | Run the Vitest tests (income model + routing) |
-| `npm run lint` | ESLint |
-
----
-
-## 📁 Project structure
+## Where things are
 
 ```
 src/
-├─ routes/
-│  ├─ index.tsx            # Entry: sign-in → profile setup → Farmer or Buyer app
-│  ├─ api/chat.ts          # POST /api/chat → Kisan Sahayak (streamed)
-│  └─ reset-password.tsx
-├─ components/fg/          # FreshGrid screens
-│  ├─ Auth.tsx  Onboarding.tsx  TopBar.tsx
-│  ├─ Shell.tsx            # Farmer app: Scan · Store · Pay · Income · Help tabs
-│  ├─ ScanTab.tsx          # Camera + AI grading + grade certificate + list a lot
-│  ├─ ColdTab.tsx  ColdMap.tsx   # Cold room booking + map
-│  ├─ PayTab.tsx  UpiPay.tsx     # Dues, lots, delivery code, (simulated) UPI
-│  ├─ IncomeTab.tsx  AssistTab.tsx
-│  └─ BuyerShell.tsx       # Buyer market + escrow orders
-├─ lib/
-│  ├─ crops.ts             # Supported crops, storage temperatures, fallback prices
-│  ├─ income.ts            # Income comparison model
-│  ├─ mandi.functions.ts   # Agmarknet server function
-│  ├─ realPlaces.ts        # OpenStreetMap Overpass lookup
-│  ├─ ai.server.ts         # Gemini streaming chat
-│  ├─ data.ts  store.tsx   # Data hooks, auth/session, language
-├─ components/ui/          # shadcn/ui building blocks
-└─ test/                   # Vitest tests
-drizzle/migrations/        # Postgres schema, RLS policies, RPCs, seed data
+├─ routes/          # index.tsx (sign-in → setup → farmer or buyer app), api/chat.ts
+├─ components/fg/   # FreshGrid screens: Shell (farmer), BuyerShell, ScanTab, ColdTab, PayTab, IncomeTab, AssistTab
+├─ lib/             # crops, income model, mandi prices, OpenStreetMap lookup, Gemini chat, data hooks
+├─ components/ui/   # shadcn/ui pieces
+└─ test/            # Vitest tests
+drizzle/migrations/ # Postgres schema, RLS policies, functions, seed data
 ```
 
----
+## Known gaps and what's next
 
-## ⚠️ Known limitations
+Right now grading only covers apple, tomato and potato on small datasets, there's no real payment gateway, ID and UPI checks aren't connected to any official system, the cold rooms are sample data, the profile form only lists six states, and there aren't many tests yet.
 
-- The AI grading models were trained on small datasets and cover only **apple, tomato and potato**. Other crops get a simulated grade.
-- **No real payment gateway.** Before real use, the "paid" step must come from a gateway webhook (see the note in `drizzle/migrations/0001_secure_money_flows.sql`).
-- Farmer ID and UPI checks are not connected to government or NPCI systems.
-- Bookable cold rooms are sample data covering a few districts in Haryana and Delhi.
-- The profile form's state and district lists cover only six states.
-- Only a small amount of automated testing (income model and routing).
+Next, we'd like to:
+1. Hook up a real UPI gateway, with escrow confirmed by webhook (see the note in `drizzle/migrations/0001_secure_money_flows.sql`).
+2. Train the grading models on bigger labelled datasets that follow AGMARK rules, and add more crops.
+3. Bring on real cold storage partners through FPOs, with live sensor data for slots and temperature.
+4. Add voice input in Hindi and regional languages, and offline support.
+5. Connect to e-NAM so graded lots can be listed on the national market.
 
-## 🛣️ Roadmap
+## Credits and notes
 
-1. Connect a real UPI / payment gateway with webhook-confirmed escrow.
-2. Train grading models on larger, labelled datasets that follow AGMARK grading rules, and add more crops.
-3. Sign up real cold storage partners through FPOs and use live sensor data for slots and temperature.
-4. Add voice input in Hindi and regional languages for farmers who can't read easily, plus offline support.
-5. Connect with e-NAM so graded lots can be listed on the national market.
-
----
-
-## 🧾 Accountability and credits
-
-- **Built by:** Rahul Rajpal ([@yellow1flash1](https://github.com/yellow1flash1)) for the hackathon.
-- **AI tools used in development:** this documentation was drafted with Claude. The product idea, the grading models and the product decisions are ours.
-- **Open data and services:** [Agmarknet / data.gov.in](https://data.gov.in) (Govt. of India Open Data), [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (© ODbL), [Teachable Machine](https://teachablemachine.withgoogle.com/), Google Gemini, Supabase.
-- **Privacy:** profile data (phone, village, ID number, UPI ID) is stored in Supabase, and each user can read only their own rows (row-level security). This is a prototype: please don't enter real Aadhaar numbers.
-- **Not affiliated** with NPCI, e-NAM, Agmarknet or any government body. Names of government schemes are used only to describe what the app is meant to work with.
+- **AI tools:** we used Claude to help draft this documentation. The idea, the grading models and the product decisions are ours.
+- **Open data and services:** [Agmarknet / data.gov.in](https://data.gov.in), [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL), [Teachable Machine](https://teachablemachine.withgoogle.com/), Google Gemini, Supabase.
+- **Privacy:** profile details (phone, village, ID number, UPI ID) are stored in Supabase, and each user can only read their own rows. It's a prototype, so please don't enter a real Aadhaar number.
+- **Not affiliated** with NPCI, e-NAM, Agmarknet or any government body. Scheme names are only used to describe what the app is meant to work with.
