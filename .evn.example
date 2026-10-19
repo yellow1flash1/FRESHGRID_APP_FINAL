@@ -1,0 +1,15 @@
+# Copy to .env and fill in. Never commit service_role keys or private API keys.
+
+# Supabase (publishable/anon key is safe for the browser ‚Äî data is protected by RLS)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-anon-key
+VITE_SUPABASE_PROJECT_ID=your-project-id
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-publishable-anon-key
+SUPABASE_PROJECT_ID=your-project-id
+
+# Optional: Kisan Sahayak AI assistant (Google AI Studio key)
+GEMINI_API_KEY=
+
+# Optional: live Agmarknet mandi prices (free key from https://data.gov.in)
+DATA_GOV_IN_API_KEY=
