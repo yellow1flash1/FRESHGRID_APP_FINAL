@@ -1,0 +1,14 @@
+{
+  "name": "FreshGrid — Scan · Store · Sell",
+  "short_name": "FreshGrid",
+  "description": "Crop grading, cold storage, trucks, mandi prices and fair payments for Indian farmers and FPOs.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBFCFA",
+  "theme_color": "#116B35",
+  "lang": "en-IN",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
